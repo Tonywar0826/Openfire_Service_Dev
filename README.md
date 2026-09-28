@@ -32,8 +32,21 @@ Openfire 作为协作平台的**可插拔独立服务**，通过两条标准通�
 | `docs/Design&Dev/` | **标准设计文档集**（00–08），从需求到缺陷跟踪 |
 | `docs/Standard-Deployment/` | Openfire **标准化部署平台**（设计 + 代码，一键部署）|
 | `docs/archive/` | 历史设计文档（过程稿，供回溯）|
-| `deploy/` | **部署文件包**（Dockerfile、compose、配置、插件、安装包）|
-| `Openfire-Integration/` | 集成脚本 + `openfire.xml` 配置 |
+| `deploy/` | **部署文件包**（见下方「安装 Openfire 服务」）|
+| `Openfire-Integration/` | 集成脚本 + UI 设计稿 |
+
+`deploy/` 下的关键文件：
+
+| 文件 | 作用 |
+|---|---|
+| `docker-compose.yml` | **Openfire 服务编排**（openfire + openfire-db + coturn 三容器，安装用这个）|
+| `docker-compose.collab-full.yml` | 协作平台**完整编排参考**（含 backend/web 等，源码由协作平台负责人维护）|
+| `docker-compose.monitoring.yml` | 监控栈（Prometheus + Grafana + 探针）|
+| `openfire.Dockerfile` + `openfire_5_1_2.tar.gz` | Openfire 5.1.2 镜像构建 |
+| `openfire.xml` | Openfire 核心配置（数据库连接 + XMPP 域）|
+| `coturn/turnserver.conf` | 音视频 TURN 中继配置 |
+| `nginx/web.conf` | Web SPA + BOSH `/http-bind/` 反代配置 |
+| `restAPI-1.12.0.jar` 等 | 插件（REST API / HTTP 上传 / monitoring 归档）|
 
 ---
 
@@ -54,24 +67,52 @@ Openfire 作为协作平台的**可插拔独立服务**，通过两条标准通�
 
 ---
 
-## 四、部署实施方法
+## 四、安装 Openfire 服务
 
-部署文件全部在 `deploy/`，核心文件：
+> 前提：目标机器已安装 **Docker + Docker Compose**。
 
-| 文件 | 作用 |
-|---|---|
-| `openfire.Dockerfile` | Openfire 5.1.2 镜像构建（base eclipse-temurin:17-jre）|
-| `openfire_5_1_2.tar.gz` | Openfire 5.1.2 官方安装包（Dockerfile 构建时解压）|
-| `docker-compose.yml` | 主编排（含 openfire + openfire-db 独立实例 + coturn 等服务）|
-| `docker-compose.monitoring.yml` | 监控栈（Prometheus + Grafana + 探针）|
-| `coturn/turnserver.conf` | 音视频 TURN 中继配置 |
-| `nginx/web.conf` | Web SPA + BOSH `/http-bind/` 反代 |
-| `restAPI-1.12.0.jar` 等 | 插件（REST API / HTTP 上传 / monitoring 归档）|
-| `postgres/init/02-openfire-user.sh` | Openfire 独立库初始化 |
+### 第 1 步：配置密码（两处改成同一个强密码）
 
-**部署前提**：Openfire 依赖一个独立的 PostgreSQL 实例（`openfire-db`），账号同步依赖 REST API 插件，音视频依赖 coturn。
+```bash
+cd deploy
+cp .env.example .env
+```
 
-> ⚠️ 环境变量（`.env`）含真实密码，**不在本仓库**。部署时参考 `deploy/.env.example` 自行填写。
+编辑两个文件，把数据库密码改成**同一个强密码**：
+
+1. `.env` 里的 `OPENFIRE_DB_PASSWORD=...`
+2. `openfire.xml` 里的 `<password>...</password>`
+
+> 两处必须一致：`.env` 决定数据库（openfire-db）的密码，`openfire.xml` 决定 Openfire 连数据库用的密码。
+
+### 第 2 步：构建 Openfire 镜像（一次性，约 1–2 分钟）
+
+```bash
+cd deploy
+docker build -f openfire.Dockerfile -t openfire-openfire:5.1.2 .
+```
+
+### 第 3 步：启动服务（3 个容器）
+
+```bash
+cd deploy
+docker compose up -d
+```
+
+启动三个容器：`openfire`（IM 引擎）、`openfire-db`（独立数据库）、`coturn`（音视频中继）。
+
+### 第 4 步：验证
+
+```bash
+docker compose ps                          # 3 个容器都应 Up
+curl -I http://localhost:19090/            # 管理台，返回 200
+```
+
+- **管理台**：http://localhost:19090 （首次默认账号 `admin` / 密码 `admin`，登录后立即修改）
+- **REST API**：`curl -u admin:admin http://localhost:19090/plugins/restapi/v1/users`
+- **插件**：需将 `restAPI.jar` 等插件放入 `openfire_plugins` 卷后重启（详见 03b 服务集成设计）
+
+> **BOSH 说明**：Openfire 的 BOSH 端口（7070）不映射宿主机，前端接入需经 nginx `/http-bind/` 反代（配置见 `nginx/web.conf`，接入细节见 `docs/Design&Dev/03b_服务集成设计.md`）。
 
 ---
 
@@ -85,7 +126,8 @@ Openfire 作为协作平台的**可插拔独立服务**，通过两条标准通�
 
 ## 六、安全提示
 
-- **真实密码/密钥不在本仓库**（`.env` 已排除）。
+- **真实密码/密钥不在本仓库**（`.env` 已排除，`openfire.xml` 密码为占位符）。
+- **数据库密码**：部署时 `.env` 与 `openfire.xml` 两处必须改成同一强密码。
+- **管理台**：首次登录 `admin/admin`，立即改密码；生产环境建议启用 HTTPS（9091）与 Blowfish 密码加密（见 `docs/Design&Dev/04_安全设计.md`）。
 - **coturn 默认密码 `collab@123` 仅供测试**，生产部署必须改强密码。
-- **`openfire.xml` 数据库密码为密文**（Blowfish 加密），解密密钥在 `security.xml`（部署时生成，不在本仓库）。
 - 证书仅含**公钥**（`cert.crt`），私钥 `cert.key` 已排除。

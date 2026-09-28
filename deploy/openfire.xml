@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Openfire 4.9.2 预置配置 — 独立 postgres 实例（openfire 库，故障隔离）
+  Openfire 5.1.2 预置配置 — 独立 postgres 实例（openfire 库，故障隔离）
   · 数据库：org.postgresql.Driver → jdbc:postgresql://openfire-db:5432/openfire
-  · 账号：openfire / 密码已 Blowfish 加密（encrypted="true"，密钥存 security.xml 的 <key><current>）
+  · 账号：openfire / 密码为【明文占位符 change-me-db-password】，部署时必须与 .env 的 OPENFIRE_DB_PASSWORD 改成同一强密码
   · XMPP 域：xmpp.collab.local
   · <setup>true</setup>：跳过 setup 向导，直接连接数据库
 -->
@@ -20,7 +20,7 @@
       <driver>org.postgresql.Driver</driver>
       <serverURL>jdbc:postgresql://openfire-db:5432/openfire</serverURL>
       <username>openfire</username>
-      <password encrypted="true">6352258c004f2304d7ada033364d1d404feb7f18b91ae421a6da56f277b1c707178e277f700ebf4dabda668ca040c88c</password>
+      <password>change-me-db-password</password>
       <testSQL>select 1</testSQL>
       <testBeforeUse>false</testBeforeUse>
       <testAfterUse>false</testAfterUse>

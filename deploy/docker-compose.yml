@@ -1,12 +1,15 @@
 # =============================================================
-# collaborate-development — 本地开发全栈编排
-# PostgreSQL 16 / Redis / RabbitMQ / MinIO / OnlyOffice + 后端 + 前端
-# 项目名（docker compose project）：collaboration-development
-#   （Docker 规范：project name 仅允许小写字母/数字/连字符，故「Collaboration Development」→ collaboration-development）
-# 依据：M0_DEPLOYMENT_DESIGN.md + deploy/web.Dockerfile + deploy/backend.Dockerfile
+# Openfire 服务独立部署编排（Openfire + openfire-db + coturn）
+# 用途：协作平台负责人单独安装 / 运行 Openfire IM 服务
+# 项目名：openfire-service
+#
+# 安装步骤见 ../README.md「安装 Openfire 服务」一节，简版：
+#   1. cp .env.example .env 并填写 OPENFIRE_DB_PASSWORD 等
+#   2. docker build -f openfire.Dockerfile -t openfire-openfire:5.1.2 .
+#   3. docker compose up -d
 # =============================================================
 
-name: collaboration-development
+name: openfire-service
 
 x-logging: &default-logging
   driver: json-file
@@ -15,153 +18,15 @@ x-logging: &default-logging
     max-file: "5"
 
 services:
-  postgres:
-    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
-    container_name: collab-postgres
-    restart: unless-stopped
-    init: true
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-collab}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 必填，请复制 .env.example 为 .env 并修改}
-      POSTGRES_DB: ${POSTGRES_DB:-collaboration}
-      # M0-2：专用应用账号密码（collab_app，非超级用户）
-      COLLAB_APP_PASSWORD: ${COLLAB_APP_PASSWORD:?COLLAB_APP_PASSWORD 必填，请复制 .env.example 为 .env 并修改}
-      # Openfire 已独立实例部署（见下方 openfire-db 服务），本库不再初始化 openfire
-      PGDATA: /var/lib/postgresql/data/pgdata
-      TZ: ${TZ:-Asia/Shanghai}
-    # WAL 归档（C8 定案：RTO≤1h / RPO≤5min，见 M0_DEPLOYMENT_DESIGN.md §8）
-    # archive_command 自愈式创建归档目录（M0-18 监控日志暴露的修复：原命令缺 mkdir 导致归档失败）
-    command:
-      - postgres
-      - -c
-      - archive_mode=on
-      - -c
-      - archive_command=test ! -f /backups/wal/%f && mkdir -p /backups/wal && cp %p /backups/wal/%f
-      - -c
-      - archive_timeout=300
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - pgbackups:/backups
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-collab} -d ${POSTGRES_DB:-collaboration}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - collab-net
-    logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-
-  redis:
-    image: ${REDIS_IMAGE:-redis:7-alpine}
-    container_name: collab-redis
-    restart: unless-stopped
-    # M0 单节点 + AOF；生产基线为主从+Sentinel（后置）
-    command:
-      - redis-server
-      - --appendonly
-      - "yes"
-      - --maxmemory
-      - 256mb
-      - --maxmemory-policy
-      - allkeys-lru
-      - --requirepass
-      - ${REDIS_PASSWORD:?REDIS_PASSWORD 必填}
-    environment:
-      REDISCLI_AUTH: ${REDIS_PASSWORD:?REDIS_PASSWORD 必填}
-    volumes:
-      - redisdata:/data
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - collab-net
-    logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 384m
-
-  rabbitmq:
-    image: ${RABBITMQ_IMAGE:-rabbitmq:3.13-management-alpine}
-    container_name: collab-rabbitmq
-    restart: unless-stopped
-    init: true
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-collab}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD 必填，请复制 .env.example 为 .env 并修改}
-      RABBITMQ_DEFAULT_VHOST: /
-      TZ: ${TZ:-Asia/Shanghai}
-    volumes:
-      - mqdata:/var/lib/rabbitmq
-    ports:
-      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
-      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    networks:
-      - collab-net
-    logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 768m
-
-  minio:
-    image: ${MINIO_IMAGE:-minio/minio:latest}
-    container_name: collab-minio
-    restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-collabadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD 必填，请复制 .env.example 为 .env 并修改}
-      # M0-18：Prometheus 抓取 /minio/v2/metrics 免认证（仅限 NAT 内网 dev；生产改 basic_auth/公钥鉴权）
-      MINIO_PROMETHEUS_AUTH_TYPE: public
-      TZ: ${TZ:-Asia/Shanghai}
-    volumes:
-      - miniodata:/data
-    ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-    networks:
-      - collab-net
-    logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 512m
-
-  # ---- Openfire 独立数据库实例（故障隔离：Openfire 库独立，不影响主 postgres）----
+  # ---- Openfire 独立数据库实例（故障隔离：与平台主库物理隔离）----
   openfire-db:
     image: ${POSTGRES_IMAGE:-postgres:16-alpine}
-    container_name: collab-openfire-db
+    container_name: openfire-db
     restart: unless-stopped
     init: true
     environment:
       POSTGRES_USER: ${OPENFIRE_USER:-openfire}
-      POSTGRES_PASSWORD: ${OPENFIRE_DB_PASSWORD:?OPENFIRE_DB_PASSWORD 必填}
+      POSTGRES_PASSWORD: ${OPENFIRE_DB_PASSWORD:?OPENFIRE_DB_PASSWORD 必填，请复制 .env.example 为 .env 并修改}
       POSTGRES_DB: ${OPENFIRE_DB:-openfire}
       PGDATA: /var/lib/postgresql/data/pgdata
       TZ: ${TZ:-Asia/Shanghai}
@@ -178,16 +43,11 @@ services:
     networks:
       - collab-net
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 512m
 
-  # ---- Openfire XMPP/IM 引擎（独立 openfire-db 实例，应用/卷独立）----
-  # 端口沿用 +10000 偏移，避免与既有 OpenFire 测试栈（openfire-server，占用 9090/5222/7070…）冲突
+  # ---- Openfire XMPP/IM 引擎（5.1.2）----
   openfire:
     image: ${OPENFIRE_IMAGE:-openfire-openfire:5.1.2}
-    container_name: collab-openfire
+    container_name: openfire
     restart: unless-stopped
     init: true
     environment:
@@ -195,37 +55,28 @@ services:
     volumes:
       - openfire_conf:/opt/openfire/conf
       - openfire_plugins:/opt/openfire/plugins
-      # 附件上传（XEP-0363 HTTP File Upload）文件持久目录：必须挂卷，否则容器重建/升级后
-      # fileRepo（/opt/openfire/fileupload）目录丢失 → 上传 PUT 500（fileRepo 指向不存在的目录）
+      # 附件上传（XEP-0363）文件持久目录：必须挂卷，否则容器重建后 fileRepo 丢失 → 上传 500
       - openfire_fileupload:/opt/openfire/fileupload
-      # 预置 PostgreSQL 连接 + XMPP 域（覆盖镜像默认配置；集成文件仍归 Openfire Integration/ 目录）
-      - "../Openfire Integration/deploy/openfire.xml:/opt/openfire/conf/openfire.xml"
+      # 预置 PostgreSQL 连接 + XMPP 域（覆盖镜像默认配置）
+      - ./openfire.xml:/opt/openfire/conf/openfire.xml
     ports:
-      # 安全加固（2026-09-20）：关闭明文端口，仅保留 TLS/HTTPS
-      # 管理台 9091 HTTPS 未启用（缺 keystore），暂保留 HTTP 9090 但仅绑定本机
-      - "127.0.0.1:${OPENFIRE_ADMIN_PORT:-19090}:9090"   # Admin Console (HTTP，仅本机)
-      # - "${OPENFIRE_SECURE_PORT:-19091}:9091"          # Admin Console (HTTPS) 未启用（缺 keystore）
-      # - "${OPENFIRE_C2S_PORT:-15222}:5222"             # XMPP c2s (明文) 已关闭 → 仅用 TLS 15223
-      - "${OPENFIRE_C2S_TLS_PORT:-15223}:5223"          # XMPP c2s (TLS)
-      # - "${OPENFIRE_BOSH_PORT:-17070}:7070"            # BOSH (明文) 已关闭 → 仅走 nginx /http-bind/ 反代
-      - "${OPENFIRE_WS_PORT:-17443}:7443"               # WebSocket
-      # - "${OPENFIRE_FTP_PORT:-17777}:7777"             # FTP 已关闭 → 附件走 httpfileupload
+      # 安全加固：关闭明文端口，仅保留 TLS/HTTPS
+      - "127.0.0.1:${OPENFIRE_ADMIN_PORT:-19090}:9090"   # Admin Console（HTTP，仅本机）
+      - "${OPENFIRE_C2S_TLS_PORT:-15223}:5223"           # XMPP c2s（TLS）
+      - "${OPENFIRE_WS_PORT:-17443}:7443"                # WebSocket
+      # BOSH 7070 不映射宿主机端口，走 nginx /http-bind/ 反代（见 Openfire-Integration 与 03b 服务集成设计）
     depends_on:
       openfire-db:
         condition: service_healthy
     networks:
       - collab-net
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 1g
 
   # ---- coturn（STUN/TURN，Openfire 音视频通话媒体中继）----
-  # Mac Docker Desktop 下容器看不到宿主机 WiFi IP，需用固定容器 IP + external-ip 配对映射到真实局域网 IP
+  # Mac Docker Desktop 下容器看不到宿主机 WiFi IP，用固定容器 IP + external-ip 配对映射真实局域网 IP
   coturn:
     image: ${COTURN_IMAGE:-coturn/coturn:latest}
-    container_name: collab-coturn
+    container_name: coturn
     restart: unless-stopped
     init: true
     command: ["-c", "/etc/turnserver.conf"]
@@ -242,102 +93,6 @@ services:
       coturn-net:
         ipv4_address: 172.30.0.10
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 256m
-
-  # ---- M3：OnlyOffice Docs（文档预览/协同编辑，统一 endpoint） ----
-  # 镜像较大（约 5GB），本地开发默认不启动；需要文档协同时 `docker compose --profile full up -d onlyoffice`
-  onlyoffice:
-    profiles: ["full"]
-    image: ${ONLYOFFICE_IMAGE:-onlyoffice/documentserver:latest}
-    container_name: collab-onlyoffice
-    restart: unless-stopped
-    environment:
-      JWT_ENABLED: "true"
-      JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:?ONLYOFFICE_JWT_SECRET 必填（与后端 ONLYOFFICE_JWT_SECRET 一致）}
-      JWT_HEADER: Authorization
-      JWT_IN_BODY: "true"
-      TZ: ${TZ:-Asia/Shanghai}
-    volumes:
-      - onlyoffice_data:/var/www/onlyoffice/Data
-      - onlyoffice_logs:/var/log/onlyoffice
-    ports:
-      - "${ONLYOFFICE_PORT:-8088}:80"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/healthcheck"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    networks:
-      - collab-net
-    logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 2g
-
-  # ---- 后端（FastAPI，容器化连接 collab-net 服务名） ----
-  backend:
-    build:
-      context: ../backend
-      dockerfile: ../deploy/backend.Dockerfile
-    image: collaboration-backend:dev
-    container_name: collab-backend
-    restart: unless-stopped
-    init: true
-    env_file:
-      - ../backend/.env
-    # 清空 Docker Desktop vpnkit 注入的代理环境变量（host.docker.internal:7890），
-    # 否则 backend 的 httpx 访问容器内服务（onlyoffice/minio 等）也走代理 → 502。
-    # 容器间通信应直连（Docker 内部网络），不走代理。
-    environment:
-      HTTP_PROXY: ""
-      HTTPS_PROXY: ""
-      http_proxy: ""
-      https_proxy: ""
-      ALL_PROXY: ""
-      all_proxy: ""
-      no_proxy: "*"
-      NO_PROXY: "*"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
-    networks:
-      - collab-net
-    logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-
-  # ---- 前端（Vue3 构建产物 + nginx，反代 /api 到 backend） ----
-  web:
-    build:
-      context: ..
-      dockerfile: deploy/web.Dockerfile
-    image: collaboration-web:dev
-    container_name: collab-web
-    restart: unless-stopped
-    depends_on:
-      backend:
-        condition: service_started
-    ports:
-      - "${WEB_PORT:-8080}:80"
-      - "${WEB_HTTPS_PORT:-8443}:443"
-    networks:
-      - collab-net
-    logging: *default-logging
 
 networks:
   collab-net:
@@ -351,13 +106,6 @@ networks:
         - subnet: 172.30.0.0/16
 
 volumes:
-  pgdata:
-  pgbackups:
-  redisdata:
-  mqdata:
-  miniodata:
-  onlyoffice_data:
-  onlyoffice_logs:
   openfire_conf:
   openfire_plugins:
   openfire_fileupload:
