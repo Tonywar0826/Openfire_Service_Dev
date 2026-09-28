@@ -1,0 +1,214 @@
+# =============================================================
+# collaborate-prod — 生产全栈编排（中间件 + OnlyOffice + 后端）
+# 用法：cp .env.prod.example .env.prod && docker compose -f docker-compose.prod.yml up -d --build
+# 前端静态由宿主机 nginx 承载（/var/www/collab-web），同源反向代理见 /etc/nginx/sites-available
+# 安全基线：中间件端口一律不发布公网（仅 127.0.0.1 供运维/宿主 nginx 访问）
+# =============================================================
+name: collaborate-prod
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    container_name: collab-postgres
+    restart: unless-stopped
+    init: true
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-collab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 必填}
+      POSTGRES_DB: ${POSTGRES_DB:-collaboration}
+      COLLAB_APP_PASSWORD: ${COLLAB_APP_PASSWORD:?COLLAB_APP_PASSWORD 必填}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-Asia/Shanghai}
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=test ! -f /backups/wal/%f && mkdir -p /backups/wal && cp %p /backups/wal/%f
+      - -c
+      - archive_timeout=300
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - pgbackups:/backups
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-collab} -d ${POSTGRES_DB:-collaboration}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - collab-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: collab-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes:
+      - redisdata:/data
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - collab-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+
+  rabbitmq:
+    image: ${RABBITMQ_IMAGE:-rabbitmq:3.13-management-alpine}
+    container_name: collab-rabbitmq
+    restart: unless-stopped
+    init: true
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-collab}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD 必填}
+      RABBITMQ_DEFAULT_VHOST: /
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - mqdata:/var/lib/rabbitmq
+    ports:
+      - "127.0.0.1:${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MGMT_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - collab-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+
+  minio:
+    image: ${MINIO_IMAGE:-minio/minio:latest}
+    container_name: collab-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-collabadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD 必填}
+      # 生产：指标鉴权保持默认（jwt），不开放 public
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - miniodata:/data
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - collab-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  onlyoffice:
+    image: ${ONLYOFFICE_IMAGE:-onlyoffice/documentserver:latest}
+    container_name: collab-onlyoffice
+    restart: unless-stopped
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:?ONLYOFFICE_JWT_SECRET 必填}
+      JWT_HEADER: Authorization
+      JWT_IN_BODY: "true"
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - onlyoffice_data:/var/www/onlyoffice/Data
+      - onlyoffice_logs:/var/log/onlyoffice
+    ports:
+      - "127.0.0.1:${ONLYOFFICE_PORT:-8088}:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - collab-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../deploy/backend.Dockerfile
+    image: collaboration-backend:prod
+    container_name: collab-backend
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ../backend/.env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    networks:
+      - collab-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+networks:
+  collab-net:
+    name: collaborate-prod-net
+    driver: bridge
+
+volumes:
+  pgdata:
+  pgbackups:
+  redisdata:
+  mqdata:
+  miniodata:
+  onlyoffice_data:
+  onlyoffice_logs:

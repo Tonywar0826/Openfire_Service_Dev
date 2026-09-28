@@ -1,0 +1,110 @@
+# 监控告警栈（独立于主栈，可单独启停，不影响业务）
+# 端口规划避开主栈：Prometheus 19093 / Grafana 13000 / cadvisor 18080
+# 部署：docker compose -f deploy/docker-compose.monitoring.yml --env-file deploy/.env up -d
+services:
+  prometheus:
+    image: docker.m.daocloud.io/prom/prometheus:latest
+    container_name: collab-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "19093:9090"
+    networks:
+      - collaboration-development-net
+
+  grafana:
+    image: docker.m.daocloud.io/grafana/grafana:latest
+    container_name: collab-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      # provisioning：自动加载数据源 + 看板（删容器重装也能自动恢复）
+      - ./monitoring/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "13000:3000"
+    networks:
+      - collaboration-development-net
+    depends_on:
+      - prometheus
+
+  cadvisor:
+    image: docker.m.daocloud.io/gcr.io/cadvisor/cadvisor:latest
+    container_name: collab-cadvisor
+    restart: unless-stopped
+    privileged: true
+    command:
+      - --store_container_labels=true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "18080:8080"
+    networks:
+      - collaboration-development-net
+
+  # 平台 postgres（collaboration 库）
+  postgres-exporter:
+    image: docker.m.daocloud.io/prometheuscommunity/postgres-exporter:latest
+    container_name: collab-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://collab_app:${COLLAB_APP_PASSWORD}@postgres:5432/collaboration?sslmode=disable"
+    ports:
+      - "19187:9187"
+    networks:
+      - collaboration-development-net
+
+  # Openfire 独立 postgres（openfire 库）
+  openfire-db-exporter:
+    image: docker.m.daocloud.io/prometheuscommunity/postgres-exporter:latest
+    container_name: collab-openfire-db-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://openfire:${OPENFIRE_DB_PASSWORD}@openfire-db:5432/openfire?sslmode=disable"
+    ports:
+      - "19188:9187"
+    networks:
+      - collaboration-development-net
+
+  redis-exporter:
+    image: docker.m.daocloud.io/oliver006/redis_exporter:latest
+    container_name: collab-redis-exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: "redis://:${REDIS_PASSWORD}@redis:6379"
+    ports:
+      - "19121:9121"
+    networks:
+      - collaboration-development-net
+
+  # 黑盒探针结果网关（BOSH 探针推送到这里）
+  pushgateway:
+    image: docker.m.daocloud.io/prom/pushgateway:latest
+    container_name: collab-pushgateway
+    restart: unless-stopped
+    ports:
+      - "19091:9091"
+    networks:
+      - collaboration-development-net
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  collaboration-development-net:
+    external: true

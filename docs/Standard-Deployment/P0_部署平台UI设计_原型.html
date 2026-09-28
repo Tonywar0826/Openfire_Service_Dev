@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Openfire 部署管理平台 — UI 原型</title>
+<style>
+  :root {
+    --brand: #5b5fc7;
+    --brand-hover: #4b4fb0;
+    --sidebar-bg: #1f2430;
+    --sidebar-text: #9aa3b2;
+    --sidebar-active: #2d3342;
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --border: #e6e8ec;
+    --text: #1f2430;
+    --muted: #6b7280;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+
+  /* 左侧侧边栏 */
+  aside { width: 232px; background: var(--sidebar-bg); color: var(--sidebar-text); display: flex; flex-direction: column; flex-shrink: 0; }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 20px 18px; color: #fff; font-weight: 600; font-size: 15px; border-bottom: 1px solid #2a3040; }
+  .logo .dot { width: 28px; height: 28px; border-radius: 7px; background: var(--brand); display: flex; align-items: center; justify-content: center; font-size: 15px; color: #fff; }
+  nav { flex: 1; padding: 12px 10px; }
+  nav .group { font-size: 11px; color: #5c6573; margin: 16px 10px 6px; letter-spacing: .5px; }
+  .menu-item { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; margin-bottom: 2px; transition: background .15s; }
+  .menu-item:hover { background: #2a3040; color: #fff; }
+  .menu-item.active { background: var(--brand); color: #fff; }
+  .menu-item .ic { width: 18px; text-align: center; font-size: 15px; }
+  .menu-item .badge { margin-left: auto; background: var(--red); color: #fff; font-size: 11px; border-radius: 9px; padding: 1px 7px; }
+  .sidebar-footer { padding: 14px 18px; border-top: 1px solid #2a3040; font-size: 12px; color: #5c6573; }
+
+  /* 主区域 */
+  main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  header { height: 60px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 14px; flex-shrink: 0; }
+  header .env { font-weight: 600; font-size: 15px; }
+  .tag { font-size: 12px; padding: 3px 10px; border-radius: 12px; background: #eef0ff; color: var(--brand); font-weight: 500; }
+  .tag.green { background: #e8f9ef; color: #16a34a; }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+  .health { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .health .dot-live { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(34,197,94,.15); }
+  .bell { position: relative; font-size: 18px; cursor: pointer; }
+  .bell::after { content: ''; position: absolute; top: -2px; right: -2px; width: 7px; height: 7px; background: var(--red); border-radius: 50%; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
+
+  /* 内容区 */
+  .content { flex: 1; overflow-y: auto; padding: 24px; }
+  .page-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .page-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+
+  /* 状态卡片 */
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .card .label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .card .value { font-size: 26px; font-weight: 700; display: flex; align-items: baseline; gap: 6px; }
+  .card .value .unit { font-size: 13px; color: var(--muted); font-weight: 400; }
+  .card .trend { font-size: 12px; margin-top: 6px; }
+  .trend.up { color: var(--green); }
+  .trend.warn { color: var(--amber); }
+
+  /* 两栏：拓扑 + 告警 */
+  .row2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .panel h3 { font-size: 15px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .panel .more { margin-left: auto; font-size: 12px; color: var(--brand); cursor: pointer; font-weight: 400; }
+
+  /* 拓扑图 */
+  .topo { display: flex; align-items: center; gap: 8px; justify-content: center; padding: 10px 0; }
+  .topo .node { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .topo .box { border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; text-align: center; background: #fafbfc; }
+  .topo .box .t { font-size: 13px; font-weight: 600; }
+  .topo .box .s { font-size: 11px; color: var(--green); margin-top: 3px; }
+  .topo .box .s.warn { color: var(--amber); }
+  .topo .link { width: 28px; height: 2px; background: var(--border); position: relative; }
+  .topo .link::after { content: '›'; position: absolute; right: -4px; top: -7px; color: var(--muted); font-size: 14px; }
+  .topo .cluster { display: flex; gap: 6px; }
+  .topo .cluster .box { padding: 12px 10px; font-size: 12px; }
+  .topo .group-label { font-size: 11px; color: var(--muted); text-align: center; margin-top: 8px; }
+
+  /* 告警列表 */
+  .alert-list { display: flex; flex-direction: column; gap: 8px; }
+  .alert { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; background: #fafbfc; border: 1px solid var(--border); }
+  .alert .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .alert .dot.green { background: var(--green); }
+  .alert .dot.amber { background: var(--amber); }
+  .alert .body { font-size: 13px; flex: 1; }
+  .alert .time { font-size: 12px; color: var(--muted); }
+
+  /* 部署向导（第二页示意） */
+  .wizard-steps { display: flex; gap: 0; margin-bottom: 24px; }
+  .step { flex: 1; text-align: center; position: relative; }
+  .step .num { width: 30px; height: 30px; border-radius: 50%; background: var(--border); color: var(--muted); display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 14px; font-weight: 600; }
+  .step.done .num { background: var(--green); color: #fff; }
+  .step.current .num { background: var(--brand); color: #fff; }
+  .step .t { font-size: 12px; color: var(--muted); }
+  .step.current .t { color: var(--text); font-weight: 600; }
+  .scale-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .scale-card { border: 2px solid var(--border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all .15s; }
+  .scale-card:hover { border-color: var(--brand); }
+  .scale-card.sel { border-color: var(--brand); background: #f8f8ff; }
+  .scale-card .sc { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  .scale-card .sc-desc { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .scale-card .sc-tag { font-size: 11px; color: var(--brand); background: #eef0ff; padding: 2px 8px; border-radius: 10px; display: inline-block; }
+  .btn { background: var(--brand); color: #fff; border: none; padding: 11px 22px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn:hover { background: var(--brand-hover); }
+  .btn.ghost { background: #fff; color: var(--text); border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+  <aside>
+    <div class="logo"><span class="dot">⚡</span> Openfire 部署平台</div>
+    <nav>
+      <div class="group">总览</div>
+      <div class="menu-item active"><span class="ic">📊</span> 概览</div>
+      <div class="menu-item"><span class="ic">🚀</span> 部署</div>
+      <div class="menu-item"><span class="ic">🕸️</span> 拓扑与扩展</div>
+      <div class="group">运维</div>
+      <div class="menu-item"><span class="ic">↩️</span> 回退</div>
+      <div class="menu-item"><span class="ic">💾</span> 备份</div>
+      <div class="menu-item"><span class="ic">📈</span> 监控 <span class="badge">1</span></div>
+      <div class="group">系统</div>
+      <div class="menu-item"><span class="ic">⚙️</span> 设置</div>
+    </nav>
+    <div class="sidebar-footer">v1.0 · 当前环境：本地测试</div>
+  </aside>
+
+  <main>
+    <header>
+      <span class="env">Openfire 本地环境</span>
+      <span class="tag">规模：中 (medium)</span>
+      <div class="header-right">
+        <div class="health"><span class="dot-live"></span> 运行正常</div>
+        <div class="bell">🔔</div>
+        <div class="avatar">管</div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="page-title">概览</div>
+      <div class="page-sub">Openfire IM 服务运行总览 · 最后更新 12:30:05</div>
+
+      <!-- 状态卡 -->
+      <div class="cards">
+        <div class="card">
+          <div class="label">Openfire 实例</div>
+          <div class="value">3 <span class="unit">个运行中</span></div>
+          <div class="trend up">▲ 全部健康</div>
+        </div>
+        <div class="card">
+          <div class="label">在线用户</div>
+          <div class="value">1,247 <span class="unit">人</span></div>
+          <div class="trend up">▲ 较昨日 +12%</div>
+        </div>
+        <div class="card">
+          <div class="label">数据库（Patroni）</div>
+          <div class="value">健康 <span class="unit">主备同步</span></div>
+          <div class="trend up">复制延迟 0ms</div>
+        </div>
+        <div class="card">
+          <div class="label">今日告警</div>
+          <div class="value">1 <span class="unit">条</span></div>
+          <div class="trend warn">⚠ 1 条资源告警待处理</div>
+        </div>
+      </div>
+
+      <!-- 拓扑 + 告警 -->
+      <div class="row2">
+        <div class="panel">
+          <h3>🕸️ 当前拓扑 <span class="more">去扩展 →</span></h3>
+          <div class="topo">
+            <div class="node"><div class="box"><div class="t">nginx</div><div class="s">负载均衡</div></div></div>
+            <div class="link"></div>
+            <div class="node">
+              <div class="cluster">
+                <div class="box"><div class="t">Openfire 1</div><div class="s">● 健康</div></div>
+                <div class="box"><div class="t">Openfire 2</div><div class="s">● 健康</div></div>
+                <div class="box"><div class="t">Openfire 3</div><div class="s">● 健康</div></div>
+              </div>
+              <div class="group-label">Hazelcast 集群</div>
+            </div>
+            <div class="link"></div>
+            <div class="node">
+              <div class="box"><div class="t">Patroni 集群</div><div class="s">主 + 从</div></div>
+              <div class="group-label">数据库</div>
+            </div>
+            <div class="link"></div>
+            <div class="node"><div class="box"><div class="t">coturn</div><div class="s">媒体</div></div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>🔔 最近告警 <span class="more">全部 →</span></h3>
+          <div class="alert-list">
+            <div class="alert"><span class="dot amber"></span><span class="body">Openfire 2 实例 CPU 使用率 82%（超阈值 80%）</span><span class="time">12:28</span></div>
+            <div class="alert"><span class="dot green"></span><span class="body">备份任务完成：2026-09-21 凌晨备份已生成</span><span class="time">04:00</span></div>
+            <div class="alert"><span class="dot green"></span><span class="body">数据库主从复制延迟恢复正常</span><span class="time">昨天</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 部署向导示意（第二页预览） -->
+      <div style="margin-top: 24px;">
+        <div class="page-title" style="font-size:16px;">部署向导（新环境）示意</div>
+        <div class="page-sub">选规模 → 填参数 → 一键部署</div>
+        <div class="wizard-steps">
+          <div class="step done"><div class="num">✓</div><div class="t">选择规模</div></div>
+          <div class="step current"><div class="num">2</div><div class="t">填写参数</div></div>
+          <div class="step"><div class="num">3</div><div class="t">确认部署</div></div>
+          <div class="step"><div class="num">4</div><div class="t">完成</div></div>
+        </div>
+        <div class="scale-cards">
+          <div class="scale-card"><div class="sc">小规模 small</div><div class="sc-desc">几百人以内 · 单实例</div><div class="sc-tag">起步/试点</div></div>
+          <div class="scale-card sel"><div class="sc">中规模 medium</div><div class="sc-desc">上千人 · 集群 2~N 实例</div><div class="sc-tag">✓ 已选择</div></div>
+          <div class="scale-card"><div class="sc">大规模 large</div><div class="sc-desc">上万人 · 跨机房</div><div class="sc-tag">大客户/容灾</div></div>
+        </div>
+        <button class="btn">下一步：填写参数 →</button>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

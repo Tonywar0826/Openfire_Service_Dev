@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Openfire 一键部署 · 配置同步与自检（原型）</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --card: #1a2233;
+    --card2: #1f2937;
+    --border: #2a3548;
+    --fg: #e5eaf2;
+    --muted: #8b98ad;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --gray: #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 24px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  /* 顶栏 */
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .header .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3);
+  }
+  .badge.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--yellow); display: inline-block; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* 步骤条 */
+  .steps { display: flex; gap: 8px; margin-bottom: 22px; }
+  .step {
+    flex: 1; display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--muted); font-weight: 500;
+  }
+  .step .num {
+    width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: var(--card2); border: 1px solid var(--border); font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  .step.active { border-color: var(--accent); color: var(--fg); }
+  .step.active .num { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .step.done { border-color: var(--green); color: var(--fg); }
+  .step.done .num { background: var(--green); border-color: var(--green); color: #fff; }
+
+  /* 汇总卡 */
+  .summary { display: flex; gap: 14px; margin-bottom: 22px; }
+  .sum-card {
+    flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px;
+  }
+  .sum-card .k { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .sum-card .v { font-size: 26px; font-weight: 700; }
+  .sum-card .v.g { color: var(--green); } .sum-card .v.r { color: var(--red); } .sum-card .v.y { color: var(--yellow); }
+
+  /* 两栏 */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border); background: var(--card2);
+  }
+  .panel-head h2 { font-size: 15px; font-weight: 600; }
+  .panel-head .tag { font-size: 12px; color: var(--muted); }
+
+  /* 配置同步清单项 */
+  .cfg-item {
+    display: flex; align-items: flex-start; gap: 12px; padding: 12px 18px;
+    border-bottom: 1px solid var(--border); transition: background .2s;
+  }
+  .cfg-item:last-child { border-bottom: none; }
+  .cfg-item:hover { background: rgba(59,130,246,.04); }
+  .status { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
+    background: var(--card2); border: 1px solid var(--border); color: var(--gray);
+  }
+  .status.ok { background: rgba(34,197,94,.15); border-color: var(--green); color: var(--green); }
+  .status.fail { background: rgba(239,68,68,.15); border-color: var(--red); color: var(--red); }
+  .status.wait { background: rgba(245,158,11,.15); border-color: var(--yellow); color: var(--yellow); }
+  .cfg-body { flex: 1; min-width: 0; }
+  .cfg-name { font-family: "SF Mono", Menlo, monospace; font-size: 13px; font-weight: 600; color: #7dd3fc; }
+  .cfg-desc { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  .cfg-dir { display: inline-block; margin-top: 5px; font-size: 11px; color: var(--muted);
+    background: var(--card2); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); }
+
+  /* 自检分层 */
+  .layer { border-bottom: 1px solid var(--border); }
+  .layer:last-child { border-bottom: none; }
+  .layer-head {
+    display: flex; align-items: center; gap: 10px; padding: 10px 18px; cursor: pointer;
+    background: var(--card2); font-weight: 600; font-size: 13px;
+  }
+  .layer-head .expand { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .check-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 18px 9px 40px;
+    border-top: 1px solid rgba(42,53,72,.6); color: var(--fg); font-size: 13px;
+  }
+  .check-item .bug { margin-left: auto; font-size: 11px; color: var(--muted); font-family: "SF Mono", Menlo, monospace; }
+
+  /* 按钮 */
+  .toolbar { margin-top: 22px; display: flex; gap: 12px; align-items: center; }
+  button {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 10px 20px;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .2s;
+  }
+  button:hover { opacity: .88; }
+  button.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .hint { color: var(--muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div>
+      <h1>Openfire 一键部署</h1>
+      <div class="sub">目标服务器：192.168.31.19 · 域名 im.example.com · 3 容器</div>
+    </div>
+    <div class="badge"><span class="dot"></span>部署中 · 正在校验</div>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><div class="num">✓</div>部署参数</div>
+    <div class="step done"><div class="num">✓</div>部署执行</div>
+    <div class="step active"><div class="num">3</div>配置同步</div>
+    <div class="step"><div class="num">4</div>自检校验</div>
+  </div>
+
+  <div class="summary">
+    <div class="sum-card"><div class="k">配置同步</div><div class="v g" id="sum-cfg">0/10</div></div>
+    <div class="sum-card"><div class="k">自检项通过</div><div class="v g" id="sum-check">0/34</div></div>
+    <div class="sum-card"><div class="k">Bug 回归</div><div class="v y" id="sum-bug">0/45</div></div>
+    <div class="sum-card"><div class="k">失败项</div><div class="v r" id="sum-fail">0</div></div>
+  </div>
+
+  <div class="cols">
+    <!-- 配置同步清单 -->
+    <div class="panel">
+      <div class="panel-head"><h2>② 配置同步清单</h2><span class="tag">逐项校验 · 名称 + 概要说明</span></div>
+      <div id="cfg-list"></div>
+    </div>
+
+    <!-- 自检清单 -->
+    <div class="panel">
+      <div class="panel-head"><h2>③ 自检校验清单</h2><span class="tag">容器 → 服务 → 功能 → Bug</span></div>
+      <div id="check-list"></div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button id="btn-run">▶ 模拟运行（逐项点亮状态）</button>
+    <button class="ghost" id="btn-reset">重置</button>
+    <span class="hint">原型演示：点击「模拟运行」看每项从 ⏳ → ✅ 的动态校验过程</span>
+  </div>
+
+</div>
+
+<script>
+const CFG = [
+  { n:"OPENFIRE_XMPP_DOMAIN", d:"XMPP 域名（账号 JID 后缀），必须与 Openfire 部署的域名完全一致，否则前端登录失败", dir:"backend/.env", dirCls:"部署→协作平台" },
+  { n:"OPENFIRE_ADMIN_PASSWORD", d:"admin 密码，后端调 REST API 的认证密码，必须与部署时填的 admin 密码一致", dir:"backend/.env", dirCls:"部署→协作平台" },
+  { n:"OPENFIRE_ADMIN_URL", d:"REST API 地址（同机=openfire:9090；远程=IP:端口）", dir:"backend/.env", dirCls:"部署→协作平台" },
+  { n:"OPENFIRE_ADMIN_USERNAME", d:"REST 认证用户名，固定 admin，Openfire 的 admin 账号必须叫 admin", dir:"backend/.env", dirCls:"协作平台→部署" },
+  { n:"OPENFIRE_REST_SECRET", d:"REST API 插件 secret，需与 Openfire plugin.restapi.secret 一致", dir:"backend/.env", dirCls:"协作平台→部署" },
+  { n:"coturn 端口 13478", d:"前端音视频 ICE 服务器写死 13478，部署的 coturn 必须监听同端口", dir:"call-manager.ts + coturn", dirCls:"协作平台→部署" },
+  { n:"coturn 静态用户 collab", d:"前端 TURN 认证写死 collab/collab@123，coturn 必须配相同静态用户", dir:"call-manager.ts + coturn", dirCls:"协作平台→部署" },
+  { n:"nginx /http-bind/", d:"BOSH 反代 → openfire:7070（前端登录走这里）", dir:"deploy/nginx/web.conf", dirCls:"固定/可变" },
+  { n:"nginx /ws/", d:"WebSocket 反代 → openfire:7070", dir:"deploy/nginx/web.conf", dirCls:"固定/可变" },
+  { n:"nginx /httpfileupload/", d:"文件上传反代 → openfire:7070（历史文件显示）", dir:"deploy/nginx/web.conf", dirCls:"固定/可变" },
+];
+
+const LAYERS = [
+  { name:"L1 · 容器运行状态", items:[
+    ["openfire 容器 Up","—"],["openfire-db 容器 Up + healthy","—"],["coturn 容器 Up","—"] ]},
+  { name:"L2 · Openfire 服务状态", items:[
+    ["管理台 9090 HTTP 200","—"],["数据库 33 张表建好","—"],["5 插件加载（restapi/monitoring/httpfileupload/admin/search）","BUG-001/002"],
+    ["REST API /users 返回 200 非 302","BUG-003"],["admin basic auth 通过","BUG-004"],["域名 xmpp.domain=客户域名","—"],
+    ["REST /sessions 返回 200","BUG-035"],["消息归档 conversation.*=true","BUG-040"] ]},
+  { name:"L3 · 功能测试（现有测试脚本）", items:[
+    ["BOSH 登录（SCRAM）成功","BUG-017/018/036"],["1v1 消息收发","—"],["离线消息落 ofOffline","BUG-033"],
+    ["群聊 MUC 建房者入群","BUG-023"],["音视频信令 initiate→accept","BUG-019/020/024/025/039/042/043/044/045"],
+    ["文件上传 PUT 201 + GET 200","BUG-046"],["历史记录 MAM 查询","BUG-040"],["账号同步 建号→ofUser","BUG-006/034/037"] ]},
+  { name:"L4 · Bug 回归确认", items:[
+    ["46 个 Bug 全部映射到上表检查项","—"],["BUG-038 手机端单向呼叫","⏳ 延后（移动端固有限制）"] ]},
+];
+
+function renderCfg() {
+  const el = document.getElementById('cfg-list');
+  el.innerHTML = CFG.map((c,i)=>`
+    <div class="cfg-item" data-cfg="${i}">
+      <div class="status" id="cfg-st-${i}">·</div>
+      <div class="cfg-body">
+        <div class="cfg-name">${c.n}</div>
+        <div class="cfg-desc">${c.d}</div>
+        <span class="cfg-dir">${c.dirCls} · ${c.dir}</span>
+      </div>
+    </div>`).join('');
+}
+
+function renderCheck() {
+  const el = document.getElementById('check-list');
+  let idx = 0;
+  el.innerHTML = LAYERS.map((L,li)=>{
+    const items = L.items.map((it)=>{
+      const cur = idx++;
+      return `<div class="check-item" data-chk="${cur}">
+        <div class="status" id="chk-st-${cur}">·</div>
+        <span>${it[0]}</span><span class="bug">${it[1]}</span>
+      </div>`;
+    }).join('');
+    return `<div class="layer"><div class="layer-head">${L.name}<span class="expand">${L.items.length} 项</span></div>${items}</div>`;
+  }).join('');
+}
+
+const totalCfg = CFG.length;
+const totalChk = LAYERS.reduce((a,L)=>a+L.items.length,0);
+
+function setStatus(id, cls, txt){ const e=document.getElementById(id); e.className='status '+cls; e.textContent=txt; }
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+let running = false;
+async function run(){
+  if(running) return;
+  running = true;
+  const btn=document.getElementById('btn-run'); btn.textContent='▶ 校验中…'; btn.style.opacity=.6;
+
+  let cfgOk=0, chkOk=0, fail=0;
+
+  // 配置同步逐项
+  for(let i=0;i<totalCfg;i++){
+    setStatus('cfg-st-'+i,'wait','⏳');
+    document.getElementById('cfg-st-'+i).scrollIntoView({block:'nearest',behavior:'smooth'});
+    await sleep(320);
+    setStatus('cfg-st-'+i,'ok','✓');
+    cfgOk++; document.getElementById('sum-cfg').textContent = cfgOk+'/'+totalCfg;
+  }
+
+  // 自检逐项（L4 的 BUG-038 显示延后）
+  for(let i=0;i<totalChk;i++){
+    setStatus('chk-st-'+i,'wait','⏳');
+    document.getElementById('chk-st-'+i).scrollIntoView({block:'nearest',behavior:'smooth'});
+    await sleep(220);
+    // 最后一项（BUG-038 延后）显示黄色
+    const isLast = (i===totalChk-1);
+    if(isLast){ setStatus('chk-st-'+i,'wait','⏳'); }
+    else { setStatus('chk-st-'+i,'ok','✓'); chkOk++; }
+    document.getElementById('sum-check').textContent = chkOk+'/'+totalChk;
+  }
+
+  // Bug 回归计数（45 已确认 + 1 延后）
+  document.getElementById('sum-bug').textContent = '45/46';
+  document.getElementById('sum-fail').textContent = '0';
+
+  document.querySelector('.badge').innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>部署完成 · 全部通过';
+  document.querySelector('.badge').style.background='rgba(34,197,94,.15)';
+  document.querySelector('.badge').style.color='var(--green)';
+  document.querySelector('.badge').style.borderColor='rgba(34,197,94,.3)';
+
+  btn.textContent='✓ 校验完成'; btn.style.opacity=1;
+  running=false;
+}
+
+function reset(){
+  for(let i=0;i<totalCfg;i++) setStatus('cfg-st-'+i,'','·');
+  for(let i=0;i<totalChk;i++) setStatus('chk-st-'+i,'','·');
+  document.getElementById('sum-cfg').textContent='0/10';
+  document.getElementById('sum-check').textContent='0/34';
+  document.getElementById('sum-bug').textContent='0/45';
+  document.getElementById('sum-fail').textContent='0';
+  document.querySelector('.badge').innerHTML='<span class="dot"></span>待校验';
+  document.querySelector('.badge').style.background='rgba(245,158,11,.15)';
+  document.querySelector('.badge').style.color='var(--yellow)';
+  document.querySelector('.badge').style.borderColor='rgba(245,158,11,.3)';
+  const btn=document.getElementById('btn-run'); btn.textContent='▶ 模拟运行（逐项点亮状态）'; btn.style.opacity=1;
+}
+
+renderCfg();
+renderCheck();
+document.getElementById('btn-run').addEventListener('click', run);
+document.getElementById('btn-reset').addEventListener('click', reset);
+</script>
+</body>
+</html>

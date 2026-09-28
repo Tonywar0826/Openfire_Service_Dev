@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Messages UI 设计原图 — Teams 风格 IM</title>
+<style>
+  :root {
+    --accent: #6264A7;
+    --accent-dark: #585A96;
+    --accent-light: #ECEBF5;
+    --bg: #F5F5F5;
+    --panel: #FFFFFF;
+    --border: #E1E1E1;
+    --text: #242424;
+    --muted: #5C5C5C;
+    --muted-2: #8A8A8A;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "SF Pro Text", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #E8E8E8;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 40px;
+    color: var(--text);
+  }
+
+  .app {
+    width: 1180px; max-width: 100%;
+    height: 720px;
+    background: var(--panel);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: 0 12px 40px rgba(0,0,0,.18);
+  }
+
+  /* ── 顶部通话工具条 ── */
+  .callbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .callbar .brand { font-weight: 600; color: var(--accent); font-size: 14px; }
+  .callbar .divider { width: 1px; height: 18px; background: var(--border); }
+  .callbar input {
+    flex: 1; border: 1px solid var(--border); border-radius: 4px;
+    padding: 6px 12px; font-size: 13px; color: var(--text);
+    outline: none; background: var(--bg);
+  }
+  .callbar input:focus { border-color: var(--accent); }
+  .callbar .callbtn {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: none; border-radius: 4px; padding: 6px 12px;
+    font-size: 13px; cursor: pointer; color: #fff;
+    background: var(--accent); font-weight: 500;
+  }
+  .callbar .callbtn.video { background: #3B7ED9; }
+
+  /* ── 主区：左栏 + 聊天 ── */
+  .main { flex: 1; display: flex; min-height: 0; }
+
+  /* 左栏：会话列表 */
+  .sidebar {
+    width: 300px; flex: 0 0 300px;
+    background: #FAFAFA; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+  .sidebar .head { padding: 14px 16px 8px; font-size: 18px; font-weight: 600; }
+  .sidebar .search { padding: 0 12px 10px; }
+  .sidebar .search input {
+    width: 100%; border: 1px solid var(--border); border-radius: 4px;
+    padding: 7px 12px; font-size: 13px; background: #fff; outline: none;
+  }
+  .contact-list { flex: 1; overflow-y: auto; }
+  .contact {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; cursor: pointer; position: relative;
+  }
+  .contact:hover { background: #F0F0F0; }
+  .contact.active { background: var(--accent-light); }
+  .contact.active::before {
+    content: ""; position: absolute; left: 0; top: 8px; bottom: 8px;
+    width: 3px; background: var(--accent); border-radius: 2px;
+  }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%; flex: 0 0 38px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 600; font-size: 15px;
+  }
+  .contact .info { flex: 1; min-width: 0; }
+  .contact .name { font-size: 14px; font-weight: 500; }
+  .contact .preview { font-size: 12px; color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .contact .status-dot { width: 9px; height: 9px; border-radius: 50%; background: #6BB700; flex: 0 0 9px; }
+
+  /* 右侧：聊天窗口 */
+  .chat { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+  .chat-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  .chat-head .peer { font-size: 15px; font-weight: 600; }
+  .chat-head .presence { font-size: 12px; color: var(--muted-2); }
+  .chat-head .actions { margin-left: auto; display: flex; gap: 8px; }
+  .chat-head .iconbtn {
+    width: 32px; height: 32px; border-radius: 4px; border: none;
+    background: transparent; cursor: pointer; color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chat-head .iconbtn:hover { background: #EDEDED; }
+
+  .chat-body { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .day-sep { text-align: center; font-size: 11px; color: var(--muted-2); margin: 4px 0; }
+
+  .msg { display: flex; gap: 10px; max-width: 72%; }
+  .msg.me { align-self: flex-end; flex-direction: row-reverse; }
+  .msg.them { align-self: flex-start; }
+  .msg .avatar { flex: 0 0 30px; width: 30px; height: 30px; font-size: 13px; }
+  .msg .bubble-wrap { display: flex; flex-direction: column; }
+  .msg .meta { font-size: 11px; color: var(--muted-2); margin-bottom: 3px; }
+  .msg.me .meta { text-align: right; }
+  .msg .bubble {
+    padding: 9px 13px; border-radius: 8px; font-size: 14px; line-height: 1.45;
+    background: #fff; border: 1px solid var(--border);
+  }
+  .msg.me .bubble { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .msg .time { font-size: 10px; color: var(--muted-2); margin-top: 3px; }
+  .msg.me .time { text-align: right; }
+
+  /* 输入区 */
+  .composer {
+    display: flex; align-items: flex-end; gap: 8px;
+    padding: 12px 16px; background: var(--panel); border-top: 1px solid var(--border);
+  }
+  .composer textarea {
+    flex: 1; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; font-size: 14px; resize: none; height: 42px;
+    font-family: inherit; outline: none; background: var(--bg);
+  }
+  .composer textarea:focus { border-color: var(--accent); }
+  .composer .send {
+    height: 42px; padding: 0 20px; border: none; border-radius: 6px;
+    background: var(--accent); color: #fff; font-size: 14px; font-weight: 500; cursor: pointer;
+  }
+  .composer .send:hover { background: var(--accent-dark); }
+</style>
+</head>
+<body>
+  <div class="app">
+
+    <!-- 顶部：音视频通话工具条 -->
+    <div class="callbar">
+      <span class="brand">消息</span>
+      <span class="divider"></span>
+      <input placeholder="输入对方用户名，发起语音 / 视频通话">
+      <button class="callbtn">📞 语音</button>
+      <button class="callbtn video">🎥 视频</button>
+    </div>
+
+    <div class="main">
+      <!-- 左栏：会话列表 -->
+      <div class="sidebar">
+        <div class="head">消息</div>
+        <div class="search"><input placeholder="搜索联系人"></div>
+        <div class="contact-list">
+          <div class="contact active">
+            <div class="avatar" style="background:#6264A7">Y</div>
+            <div class="info">
+              <div class="name">yuzhouxiang</div>
+              <div class="preview">好的，我马上看一下</div>
+            </div>
+            <div class="status-dot"></div>
+          </div>
+          <div class="contact">
+            <div class="avatar" style="background:#3B7ED9">A</div>
+            <div class="info">
+              <div class="name">admin</div>
+              <div class="preview">会议邀请已发送</div>
+            </div>
+            <div class="status-dot"></div>
+          </div>
+          <div class="contact">
+            <div class="avatar" style="background:#6BB700">T</div>
+            <div class="info">
+              <div class="name">test</div>
+              <div class="preview">你好</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：聊天窗口 -->
+      <div class="chat">
+        <div class="chat-head">
+          <div class="avatar" style="background:#6264A7;width:34px;height:34px;font-size:14px">Y</div>
+          <div>
+            <div class="peer">yuzhouxiang</div>
+            <div class="presence">在线</div>
+          </div>
+          <div class="actions">
+            <button class="iconbtn" title="语音通话">📞</button>
+            <button class="iconbtn" title="视频通话">🎥</button>
+          </div>
+        </div>
+
+        <div class="chat-body">
+          <div class="day-sep">今天 14:20</div>
+          <div class="msg them">
+            <div class="avatar" style="background:#6264A7">Y</div>
+            <div class="bubble-wrap">
+              <div class="meta">yuzhouxiang</div>
+              <div class="bubble">你好，关于下周的项目评审会议，你这边有时间吗？</div>
+              <div class="time">14:20</div>
+            </div>
+          </div>
+          <div class="msg me">
+            <div class="avatar" style="background:#3B7ED9">A</div>
+            <div class="bubble-wrap">
+              <div class="meta">我</div>
+              <div class="bubble">可以的，周四下午两点之后我都有空。</div>
+              <div class="time">14:22</div>
+            </div>
+          </div>
+          <div class="msg them">
+            <div class="avatar" style="background:#6264A7">Y</div>
+            <div class="bubble-wrap">
+              <div class="meta">yuzhouxiang</div>
+              <div class="bubble">好，那我先把会议邀请发到日程里，到时候见 👌</div>
+              <div class="time">14:23</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <textarea placeholder="输入消息…"></textarea>
+          <button class="send">发送</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

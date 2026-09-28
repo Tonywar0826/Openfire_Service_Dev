@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Openfire 4.9.2 预置配置 — 独立 postgres 实例（openfire 库，故障隔离）
+  · 数据库：org.postgresql.Driver → jdbc:postgresql://openfire-db:5432/openfire
+  · 账号：openfire / 密码已 Blowfish 加密（encrypted="true"，密钥存 security.xml 的 <key><current>）
+  · XMPP 域：xmpp.collab.local
+  · <setup>true</setup>：跳过 setup 向导，直接连接数据库
+-->
+<jive>
+  <adminConsole>
+    <port>9090</port>
+    <securePort>9091</securePort>
+  </adminConsole>
+  <locale>zh_CN</locale>
+  <connectionProvider>
+    <className>org.jivesoftware.database.DefaultConnectionProvider</className>
+  </connectionProvider>
+  <database>
+    <defaultProvider>
+      <driver>org.postgresql.Driver</driver>
+      <serverURL>jdbc:postgresql://openfire-db:5432/openfire</serverURL>
+      <username>openfire</username>
+      <password encrypted="true">6352258c004f2304d7ada033364d1d404feb7f18b91ae421a6da56f277b1c707178e277f700ebf4dabda668ca040c88c</password>
+      <testSQL>select 1</testSQL>
+      <testBeforeUse>false</testBeforeUse>
+      <testAfterUse>false</testAfterUse>
+      <testTimeout>PT0.5S</testTimeout>
+      <timeBetweenEvictionRuns>PT30S</timeBetweenEvictionRuns>
+      <minIdleTime>PT15M</minIdleTime>
+      <maxWaitTime>PT0.5S</maxWaitTime>
+      <minConnections>5</minConnections>
+      <maxConnections>25</maxConnections>
+      <connectionTimeout>1.0</connectionTimeout>
+    </defaultProvider>
+  </database>
+  <setup>true</setup>
+  <fqdn>xmpp.collab.local</fqdn>
+</jive>

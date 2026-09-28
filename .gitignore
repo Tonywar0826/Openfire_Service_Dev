@@ -1,0 +1,22 @@
+# 敏感信息（真实密码/密钥/私钥，永不入库）
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+security.xml
+
+# 已移除的功能（内部测试/他人负责，不入库）
+jitsi/
+samba-ad/
+
+# 构建产物与缓存
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# 系统文件
+.DS_Store

@@ -1,0 +1,37 @@
+# Prometheus 抓取配置（监控栈独立文件）
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus 自身
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # 容器指标（cadvisor，覆盖所有容器 CPU/内存/网络/磁盘）
+  # 新版 cadvisor 只用 id label（容器 ID），无 name
+  - job_name: cadvisor
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  # 平台 postgres（collaboration 库）
+  - job_name: postgres-platform
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  # Openfire 独立 postgres（openfire 库）
+  - job_name: postgres-openfire
+    static_configs:
+      - targets: ['openfire-db-exporter:9187']
+
+  # Redis
+  - job_name: redis
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # IM 黑盒探针（pushgateway 网关，BOSH 登录探测）
+  - job_name: im-probe
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']

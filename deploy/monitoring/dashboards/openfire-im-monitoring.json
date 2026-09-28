@@ -1,0 +1,564 @@
+{
+  "editable": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "title": "① IM 服务健康（端到端探针）",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "id": 101,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "im_login_success",
+          "legendFormat": "1=正常 0=失败",
+          "refId": "A"
+        }
+      ],
+      "title": "IM 登录成功率",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "smooth",
+            "showPoints": "never"
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 18,
+        "x": 6,
+        "y": 1
+      },
+      "id": 102,
+      "targets": [
+        {
+          "expr": "im_login_latency_seconds",
+          "legendFormat": "登录耗时(秒)",
+          "refId": "A"
+        }
+      ],
+      "title": "IM 登录延迟",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 200,
+      "title": "② Openfire 容器资源（cadvisor）",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "smooth",
+            "showPoints": "never"
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 6
+      },
+      "id": 201,
+      "targets": [
+        {
+          "expr": "rate(container_cpu_usage_seconds_total{id=~\"/docker/2e6b2ff6e40d.*\"}[5m]) * 100",
+          "legendFormat": "CPU %",
+          "refId": "A"
+        }
+      ],
+      "title": "CPU 使用率",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "smooth",
+            "showPoints": "never"
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 6
+      },
+      "id": 202,
+      "targets": [
+        {
+          "expr": "container_memory_usage_bytes{id=~\"/docker/2e6b2ff6e40d.*\"}",
+          "legendFormat": "内存使用",
+          "refId": "A"
+        }
+      ],
+      "title": "内存使用",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "smooth",
+            "showPoints": "never"
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 6
+      },
+      "id": 203,
+      "targets": [
+        {
+          "expr": "rate(container_fs_reads_bytes_total{id=~\"/docker/2e6b2ff6e40d.*\"}[5m])",
+          "legendFormat": "读",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(container_fs_writes_bytes_total{id=~\"/docker/2e6b2ff6e40d.*\"}[5m])",
+          "legendFormat": "写",
+          "refId": "B"
+        }
+      ],
+      "title": "磁盘 IO",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 300,
+      "title": "③ Openfire 数据库（openfire-db）",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "smooth",
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 15
+      },
+      "id": 301,
+      "targets": [
+        {
+          "expr": "pg_stat_database_numbackends{job=\"postgres-openfire\", datname=\"openfire\"}",
+          "legendFormat": "连接数",
+          "refId": "A"
+        }
+      ],
+      "title": "数据库连接数",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "smooth",
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 15
+      },
+      "id": 302,
+      "targets": [
+        {
+          "expr": "pg_stat_database_xact_commit{job=\"postgres-openfire\", datname=\"openfire\"}",
+          "legendFormat": "提交",
+          "refId": "A"
+        },
+        {
+          "expr": "pg_stat_database_xact_rollback{job=\"postgres-openfire\", datname=\"openfire\"}",
+          "legendFormat": "回滚",
+          "refId": "B"
+        }
+      ],
+      "title": "事务提交/回滚",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "smooth",
+            "showPoints": "never"
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 15
+      },
+      "id": 303,
+      "targets": [
+        {
+          "expr": "100 * pg_stat_database_blks_hit{job=\"postgres-openfire\", datname=\"openfire\"} / (pg_stat_database_blks_hit{job=\"postgres-openfire\", datname=\"openfire\"} + pg_stat_database_blks_read{job=\"postgres-openfire\", datname=\"openfire\"})",
+          "legendFormat": "命中率 %",
+          "refId": "A"
+        }
+      ],
+      "title": "缓存命中率",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 400,
+      "title": "④ Openfire 业务数据（用户/通讯录/消息）",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 0,
+        "y": 24
+      },
+      "id": 401,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "pg_stat_user_tables_n_live_tup{job=\"postgres-openfire\", relname=\"ofuser\"}",
+          "legendFormat": "ofuser",
+          "refId": "A"
+        }
+      ],
+      "title": "用户数",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 5,
+        "y": 24
+      },
+      "id": 402,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "pg_stat_user_tables_n_live_tup{job=\"postgres-openfire\", relname=\"ofroster\"}",
+          "legendFormat": "ofroster",
+          "refId": "A"
+        }
+      ],
+      "title": "通讯录关系",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 10,
+        "y": 24
+      },
+      "id": 403,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "pg_stat_user_tables_n_live_tup{job=\"postgres-openfire\", relname=\"ofpresence\"}",
+          "legendFormat": "ofpresence",
+          "refId": "A"
+        }
+      ],
+      "title": "在线记录",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 15,
+        "y": 24
+      },
+      "id": 404,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "pg_stat_user_tables_n_live_tup{job=\"postgres-openfire\", relname=\"ofoffline\"}",
+          "legendFormat": "ofoffline",
+          "refId": "A"
+        }
+      ],
+      "title": "离线消息",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "afysmv31mxx4wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 20,
+        "y": 24
+      },
+      "id": 405,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "pg_stat_user_tables_n_live_tup{job=\"postgres-openfire\", relname=\"ofmucroom\"}",
+          "legendFormat": "ofmucroom",
+          "refId": "A"
+        }
+      ],
+      "title": "群聊房间",
+      "type": "stat"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "openfire",
+    "im"
+  ],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Openfire IM 服务监控",
+  "uid": "openfire-im-monitoring"
+}

@@ -1,0 +1,42 @@
+# Openfire AI Deployment Manager —— 部署管理平台（P0 骨架）
+# 跑在实施人员个人电脑的 Docker 里，远程管理客户服务器。
+name: openfire-ai-deployment-manager
+
+services:
+  backend:
+    build:
+      context: ./backend
+    image: openfire-ai-deployment-manager-backend:0.1.0
+    container_name: ofdm-backend
+    restart: unless-stopped
+    ports:
+      - "18000:8000"
+    environment:
+      COMPOSE_DIR: /Users/yuzhouxiang/ofdm-deploy
+      BACKUP_DIR: /opt/backup
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /Users/yuzhouxiang/ofdm-deploy:/Users/yuzhouxiang/ofdm-deploy
+      - backup_data:/opt/backup
+    networks:
+      - ofdm-net
+
+  frontend:
+    build:
+      context: ./frontend
+    image: openfire-ai-deployment-manager-frontend:0.1.0
+    container_name: ofdm-frontend
+    restart: unless-stopped
+    ports:
+      - "18088:80"
+    depends_on:
+      - backend
+    networks:
+      - ofdm-net
+
+volumes:
+  backup_data:
+
+networks:
+  ofdm-net:
+    driver: bridge

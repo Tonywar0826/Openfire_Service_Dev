@@ -1,0 +1,138 @@
+# =============================================================
+# collaborate-obs — M0-18 最小监控 + M0-19 日志集中采集骨架
+# Prometheus / Grafana / node-exporter / cAdvisor /
+# postgres-exporter / redis-exporter / Loki / promtail
+# 依赖：collab-net（deploy/docker-compose.yml 创建，external）
+# 验收：Grafana 面板展示主机与中间件指标；Loki 可检索容器日志
+# =============================================================
+
+name: collaborate-obs
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+networks:
+  collab-net:
+    external: true
+    name: collaborate-m0-net
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: obs-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    ports:
+      - "9090:9090"
+    networks: [collab-net]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: obs-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    networks: [collab-net]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: obs-node-exporter
+    restart: unless-stopped
+    command: ["--path.rootfs=/host"]
+    volumes:
+      - /:/host:ro,rslave
+    pid: host
+    networks: [collab-net]
+    logging: *default-logging
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: obs-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks: [collab-net]
+    logging: *default-logging
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: obs-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://collab_app:${COLLAB_APP_PASSWORD:?COLLAB_APP_PASSWORD 必填}@collab-postgres:5432/collaboration?sslmode=disable
+    networks: [collab-net]
+    logging: *default-logging
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: obs-redis-exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://collab-redis:6379
+    networks: [collab-net]
+    logging: *default-logging
+
+  loki:
+    image: grafana/loki:latest
+    container_name: obs-loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki-config.yml"]
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - lokidata:/loki
+    ports:
+      - "3100:3100"
+    networks: [collab-net]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: obs-promtail
+    restart: unless-stopped
+    command: ["-config.file=/etc/promtail/promtail-config.yml"]
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [collab-net]
+    logging: *default-logging
+
+volumes:
+  promdata:
+  grafanadata:
+  lokidata:

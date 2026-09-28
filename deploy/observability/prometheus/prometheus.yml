@@ -1,0 +1,36 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # 主机指标（node-exporter）
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  # 容器指标（cAdvisor）
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  # PostgreSQL（postgres-exporter，collab_app 带 pg_monitor 角色）
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  # Redis（redis-exporter）
+  - job_name: redis
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  # RabbitMQ 内置 Prometheus 插件（management 镜像默认启用，15692）
+  - job_name: rabbitmq
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["collab-rabbitmq:15692"]
+
+  # MinIO 内置指标（M0-18 起 MINIO_PROMETHEUS_AUTH_TYPE=public；生产改鉴权）
+  - job_name: minio
+    metrics_path: /minio/v2/metrics/cluster
+    static_configs:
+      - targets: ["collab-minio:9000"]
