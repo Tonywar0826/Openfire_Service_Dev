@@ -31,7 +31,6 @@ Openfire 作为协作平台的**可插拔独立服务**，通过两条标准通�
 |---|---|
 | `docs/Design&Dev/` | **标准设计文档集**（00–08），从需求到缺陷跟踪 |
 | `docs/Standard-Deployment/` | Openfire **标准化部署平台**（设计 + 代码，一键部署）|
-| `docs/archive/` | 历史设计文档（过程稿，供回溯）|
 | `deploy/` | **部署文件包**（见下方「安装 Openfire 服务」）|
 | `Openfire-Integration/` | 集成脚本 + UI 设计稿 |
 
